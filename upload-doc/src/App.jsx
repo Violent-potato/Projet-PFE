@@ -4,23 +4,55 @@ export default function App() {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  const selectFile = (selectedFile) => {
+    setFile(selectedFile);
+    setError("");
+    setResult(null);
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
+    if (dropped) selectFile(dropped);
   };
 
   const handleSelect = (e) => {
     const selected = e.target.files[0];
-    if (selected) setFile(selected);
+    if (selected) selectFile(selected);
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || isUploading) return;
 
-    //Envoi API à ajouter
+    const formData = new FormData();
+    formData.append("file", file);
+    setIsUploading(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${apiUrl}/cv/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Erreur lors de l'extraction du CV.");
+      }
+
+      setResult(data);
+    } catch (uploadError) {
+      setError(uploadError.message || "Impossible de contacter l'API.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -48,6 +80,7 @@ export default function App() {
           <input
             ref={inputRef}
             type="file"
+            accept=".pdf,.docx"
             onChange={handleSelect}
             style={{ display: "none" }}
           />
@@ -63,13 +96,35 @@ export default function App() {
         {/* Pour la partie API */}
         <div style={{ ...styles.box, ...styles.uploadBox }}>
           <button
-            style={{ ...styles.button, ...(file ? {} : styles.buttonDisabled) }}
+            style={{
+              ...styles.button,
+              ...(file && !isUploading ? {} : styles.buttonDisabled),
+            }}
             onClick={handleUpload}
-            disabled={!file}
+            disabled={!file || isUploading}
           >
-            Envoyer le document
+            {isUploading ? "Extraction en cours..." : "Envoyer le document"}
           </button>
         </div>
+        {error && (
+          <p role="alert" style={styles.error}>
+            {error}
+          </p>
+        )}
+        {result && (
+          <div style={{ ...styles.box, ...styles.result }}>
+            <p>
+              {result.format} · {result.character_count} caractères
+              {result.page_count != null && ` · ${result.page_count} page(s)`}
+            </p>
+            {result.warnings.map((warning) => (
+              <p key={warning} style={styles.warning}>
+                {warning}
+              </p>
+            ))}
+            <pre style={styles.extractedText}>{result.text}</pre>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -125,4 +180,13 @@ const styles = {
     cursor: "pointer",
   },
   buttonDisabled: { background: "#b9c2d3", cursor: "not-allowed" },
+  error: { color: "#b42318" },
+  result: { padding: 16, border: "1px solid #dde2ec", textAlign: "left" },
+  warning: { color: "#8a5a00" },
+  extractedText: {
+    maxHeight: 360,
+    overflow: "auto",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+  },
 };

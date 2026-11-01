@@ -1,0 +1,3 @@
+-r requirements.txt
+-r extraction-cv/requirements.txt
+httpx

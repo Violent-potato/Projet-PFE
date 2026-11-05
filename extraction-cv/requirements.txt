@@ -1,3 +1,7 @@
 PyMuPDF
 python-docx
 pytest
+language-tool-python
+fastapi
+uvicorn[standard]
+python-multipart

@@ -46,13 +46,34 @@ export default function App() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
+
     const dropped = e.dataTransfer.files[0];
-    if (dropped) selectFile(dropped);
+    if (!dropped) return;
+
+    const extension = dropped.name.split(".").pop().toLowerCase();
+
+    if (!["pdf", "docx"].includes(extension)) {
+      alert("Veuillez sélectionner un CV au format PDF ou DOCX.");
+      return;
+    }
+
+    setFile(dropped);
   };
 
   const handleSelect = (e) => {
     const selected = e.target.files[0];
-    if (selected) selectFile(selected);
+
+    if (!selected) return;
+
+    const extension = selected.name.split(".").pop().toLowerCase();
+
+    if (!["pdf", "docx"].includes(extension)) {
+      alert("Veuillez sélectionner un CV au format PDF ou DOCX.");
+      e.target.value = "";
+      return;
+    }
+
+    setFile(selected);
   };
 
   //option pour retirer le fichier déposé
@@ -111,41 +132,38 @@ export default function App() {
       <section className="cv-container">
         <h1 className="cv-title">Étape 1 : importez votre CV</h1>
 
-        <div className="cv-card">
-          <div
-            className={`cv-dropzone${isDragging ? " is-dragging" : ""}${
-              file ? " has-file" : ""
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            onClick={handleZoneAction}
-            role="button"
-            aria-label={file ? "Retirer le document" : undefined}
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && handleZoneAction()}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf,.docx"
-              onChange={handleSelect}
-              style={{ display: "none" }}
-            />
-            <div>
-              {file && <p className="cv-file-name">{file.name}</p>}
-              <p className="cv-hint">.pdf et .docx autorisés</p>
-            </div>
-            {file && (
-              <div className="cv-veil" aria-hidden="true">
-                <TrashIcon />
-                <span>Retirer le document</span>
-              </div>
-            )}
-          </div>
+        <div
+          style={{
+            ...styles.box,
+            ...styles.dropzone,
+            ...(isDragging ? styles.dropzoneActive : {}),
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && inputRef.current.click()}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleSelect}
+            style={{ display: "none" }}
+          />
+          {file ? (
+            <p style={styles.fileName}>{file.name}</p>
+          ) : (
+            <p style={styles.hint}>
+              Glissez un document ici ou cliquez pour le choisir
+            </p>
+          )}
+        </div>
 
           <button
             className="cv-button"

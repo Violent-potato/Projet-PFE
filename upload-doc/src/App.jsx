@@ -1,9 +1,47 @@
 import { useRef, useState } from "react";
+import "./App.css";
+
+//trashcan pour l'option de retirer le doc déposé
+function TrashIcon({ size = 22 }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx"];
+const FORMAT_ERROR = "Impossible d'importer le CV, format non supporté";
 
 export default function App() {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const [errorKey, setErrorKey] = useState(0);
+
+  const selectFile = (selectedFile) => {
+    setFile(selectedFile);
+    setError("");
+    setResult(null);
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -38,16 +76,61 @@ export default function App() {
     setFile(selected);
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  //option pour retirer le fichier déposé
+  const removeFile = () => {
+    setFile(null);
+    setError("");
+    setResult(null);
+    if (inputRef.current) inputRef.current.value = ""; //permet de choisir le même fichier
+  };
 
-    //Envoi API à ajouter
+  const handleZoneAction = () =>
+    file ? removeFile() : inputRef.current.click();
+
+  const handleUpload = async () => {
+    if (!file || isUploading) return;
+
+    //Vérification du format avant envoi à l'API
+    const isSupported = ACCEPTED_EXTENSIONS.some((ext) =>
+      file.name.toLowerCase().endsWith(ext)
+    );
+    if (!isSupported) {
+      setResult(null);
+      setError(FORMAT_ERROR);
+      setErrorKey((k) => k + 1);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    setIsUploading(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${apiUrl}/cv/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Erreur lors de l'extraction du CV.");
+      }
+
+      setResult(data);
+    } catch (uploadError) {
+      setError(uploadError.message || "Impossible de contacter l'API.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
-    <main style={styles.page}>
-      <section style={styles.container}>
-        <h1 style={styles.title}>Importer un document</h1>
+    <main className="cv-page">
+      <section className="cv-container">
+        <h1 className="cv-title">Étape 1 : importez votre CV</h1>
 
         <div
           style={{
@@ -82,69 +165,38 @@ export default function App() {
           )}
         </div>
 
-        {/* Pour la partie API */}
-        <div style={{ ...styles.box, ...styles.uploadBox }}>
           <button
-            style={{ ...styles.button, ...(file ? {} : styles.buttonDisabled) }}
+            className="cv-button"
             onClick={handleUpload}
-            disabled={!file}
+            disabled={!file || isUploading}
           >
-            Envoyer le document
+            {isUploading ? "Importation…" : "Importer"}
           </button>
+
+          <div className="cv-error-slot">
+            {error && (
+              <p key={errorKey} role="alert" className="cv-error-banner">
+                {error}
+              </p>
+            )}
+          </div>
         </div>
+
+        {result && (
+          <div className="cv-result">
+            <p>
+              {result.format} · {result.character_count} caractères
+              {result.page_count != null && ` · ${result.page_count} page(s)`}
+            </p>
+            {result.warnings.map((warning) => (
+              <p key={warning} className="cv-warning">
+                {warning}
+              </p>
+            ))}
+            <pre className="cv-extracted">{result.text}</pre>
+          </div>
+        )}
       </section>
     </main>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f3f5f8",
-    fontFamily: "system-ui, sans-serif",
-    color: "#1c2333",
-  },
-  container: {
-    width: "100%",
-    maxWidth: 520,
-    padding: 24,
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-  title: { margin: 0, fontSize: 24, fontWeight: 600 },
-  box: { borderRadius: 12, background: "#fff" },
-  dropzone: {
-    height: 200,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "2px dashed #b9c2d3",
-    cursor: "pointer",
-    textAlign: "center",
-    padding: 16,
-    transition: "border-color 0.15s, background 0.15s",
-  },
-  dropzoneActive: { borderColor: "#2b4fd8", background: "#eef2ff" },
-  hint: { margin: 0, color: "#5b667d" },
-  fileName: { margin: 0, fontWeight: 600, wordBreak: "break-all" },
-  uploadBox: {
-    padding: 16,
-    border: "1px solid #dde2ec",
-    display: "flex",
-    justifyContent: "center",
-  },
-  button: {
-    padding: "10px 20px",
-    border: "none",
-    borderRadius: 8,
-    background: "#2b4fd8",
-    color: "#fff",
-    fontSize: 16,
-    cursor: "pointer",
-  },
-  buttonDisabled: { background: "#b9c2d3", cursor: "not-allowed" },
-};

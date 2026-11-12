@@ -8,13 +8,34 @@ export default function App() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
+
     const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
+    if (!dropped) return;
+
+    const extension = dropped.name.split(".").pop().toLowerCase();
+
+    if (!["pdf", "docx"].includes(extension)) {
+      alert("Veuillez sélectionner un CV au format PDF ou DOCX.");
+      return;
+    }
+
+    setFile(dropped);
   };
 
   const handleSelect = (e) => {
     const selected = e.target.files[0];
-    if (selected) setFile(selected);
+
+    if (!selected) return;
+
+    const extension = selected.name.split(".").pop().toLowerCase();
+
+    if (!["pdf", "docx"].includes(extension)) {
+      alert("Veuillez sélectionner un CV au format PDF ou DOCX.");
+      e.target.value = "";
+      return;
+    }
+
+    setFile(selected);
   };
 
   const handleUpload = async () => {
@@ -48,6 +69,7 @@ export default function App() {
           <input
             ref={inputRef}
             type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={handleSelect}
             style={{ display: "none" }}
           />
